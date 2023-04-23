@@ -1,4 +1,4 @@
-# AES-_in_C
+# AES_in_C
 implementation of AES in C (never do this)
 
 AES encryption algorithm implemented using this fantastic paper http://www.infosecwriters.com/text_resources/pdf/AESbyExample.pdf

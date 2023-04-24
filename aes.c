@@ -555,8 +555,6 @@ int main(size_t argc, char **args) {
         return err;
     };
 
-    fprintf(stderr, "\n\ninput: %.*s\n\n", messageLength, input.data);
-
     int newLength;
 
     if (mode == 'e'){
@@ -573,9 +571,6 @@ int main(size_t argc, char **args) {
         tmp[1] = '\0';
         printf("%c", input.data[i]);
     }
-    // fprintf(stderr, "\n\noutput: %.*s\n\n", newLength, input.data);
-
-    
 
     destroyBuffer(&input);
     return 0;

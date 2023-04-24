@@ -3,6 +3,9 @@
 
 #include "Buffer.h"
 
+// another project of mine. thought I'd try it out in an actual application
+// repo: https://github.com/JesseRussell411/byte_buffer
+
 static size_t minsize_t(size_t a, size_t b)
 {
     if (a < b)

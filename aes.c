@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#include "Buffer.h"
+
 uint8_t E[256] = {
     0x01, 0x03, 0x05, 0x0F, 0x11, 0x33, 0x55, 0xFF, 0x1A, 0x2E, 0x72, 0x96, 0xA1, 0xF8, 0x13, 0x35,
     0x5F, 0xE1, 0x38, 0x48, 0xD8, 0x73, 0x95, 0xA4, 0xF7, 0x02, 0x06, 0x0A, 0x1E, 0x22, 0x66, 0xAA,
@@ -389,7 +391,7 @@ void encrypt_128(uint8_t *block, uint8_t *key)
     shiftRows(state);
     addRoundKey(state, expandedKey + 16 * (numberOfRounds));
 
-    memcpy(block, state, 16);  
+    memcpy(block, state, 16);
 }
 
 void decrypt_128(uint8_t *block, uint8_t *key)
@@ -499,7 +501,6 @@ size_t encrypt_128_ecb(uint8_t *key, uint8_t *message, size_t length, size_t cap
  * @return size_t 
  */
 size_t decrypt_128_ecb(uint8_t *key, uint8_t *message, size_t length) {
-    
     // decrypt the message in bocks
     for(size_t i = 0; i < length; i += 16) {
         decrypt_128(message + i, key);
@@ -509,18 +510,84 @@ size_t decrypt_128_ecb(uint8_t *key, uint8_t *message, size_t length) {
     return byteUnPad(message, length);
 }
 
+int main(size_t argc, char **args) {
+    if (argc != 3){
+        fputs("invalid number of arguments, 2 expected", stderr);
+        return 1;
+    }
+
+    char mode = args[1][0];
+    if (mode != 'e' && mode != 'd'){
+        fputs("invalid mode expected 'e' (ecrypt) or 'd' (decrypt)", stderr);
+        return 1;
+    }
+
+    size_t keyLength = strlen(args[2]);
+    char key[16];
+    for(int i = 0; i < 16; i++) {
+        key[i] = 0x00;
+    }
+
+    memcpy(key, args[2], keyLength);
+
+    if (keyLength < 16){
+        fputs("key too short. padding with zeros\n", stderr);
+    } else if (keyLength > 16) {
+        fputs("key too long. extra bytes will be ignored\n", stderr);
+    }
+
+    Buffer input = createBuffer();
+
+    size_t messageLength = 0;
+
+    // read stdin
+    int c;
+    while((c = getchar()) != EOF) {
+        bufferAppendByte(&input, (char)c);
+        messageLength++;
+    }
 
 
+    // trim buffer or add capacity for padding and null terminator
+    BufferError err = bufferSetSize(&input, messageLength + 17);
+    if (err) {
+        destroyBuffer(&input);
+        return err;
+    };
+
+    fprintf(stderr, "\n\ninput: %.*s\n\n", messageLength, input.data);
+
+    int newLength;
+
+    if (mode == 'e'){
+        // can ignore output as the capacity is definitely enough
+        newLength = encrypt_128_ecb(key, input.data, messageLength, input.size);
+    } else {
+        newLength = decrypt_128_ecb(key, input.data, messageLength);
+    }
+
+    // printf("%.*s", newLength, input.data);
+    for(size_t i = 0; i < newLength; i++){
+        char tmp[2];
+        tmp[0] = input.data[i];
+        tmp[1] = '\0';
+        printf("%c", input.data[i]);
+    }
+    // fprintf(stderr, "\n\noutput: %.*s\n\n", newLength, input.data);
+
+    
+
+    destroyBuffer(&input);
+    return 0;
+}
 
 
-
-
-int main()
+void scratch()
 {
     // uint8_t *message = "The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog! The quick brown fox jumps over the lazy dog?";
 
     // message that is 32 bytes long(including null terminator)
-    uint8_t *message = "0123456789abcdef0123456789abcde";
+    uint8_t *message = "0123456789abcdef0123456789abcd";
 
     uint8_t *key = "aes rules!!!!!!"; /* key padded with exclamation points to be 16 bytes, including null terminator.*/
 
@@ -540,68 +607,14 @@ int main()
     // print message post-encryption
     printf("post encryption: %s\n", messageBuffer);
 
-    printf("post encryption length: %d\n", encryptedLength);
 
     //decrypt
     decrypt_128_ecb(key, messageBuffer, encryptedLength);
 
     // print message post decryption
     printf("post decryption: %s\n", messageBuffer);
+    printf("pre encryption length:  %d\n", messageLength /* null term */);
+    printf("post encryption length: %d\n", encryptedLength);
 
     free(messageBuffer);
-
-    // uint8_t key[16] = {
-    //     1,
-    //     2,
-    //     3,
-    //     4,
-    //     5,
-    //     6,
-    //     7,
-    //     8,
-    //     9,
-    //     10,
-    //     11,
-    //     12,
-    //     13,
-    //     14,
-    //     15,
-    //     16
-    // };
-
-    // printf("%s\n", message);
-    // encrypt_128(message, key);
-    // for(int i = 0; i < 16; i++){
-    //     printf(" %X", message[i]);
-    // }
-    // printf("\n");
-
-    // printf(" encrypt...");
-    // printf(" %s\n", message);
-    // printf(" decrypt...");
-    // decrypt_128(message, key);
-    // printf(" %s\n", message);
-
-
-    // for(int i = 0; i < 16; i++){
-    //     printf(" %X", key[i]);
-    // }
-    // printf("\n");
-
-
-    // shiftRows(key);
-
-    // for(int i = 0; i < 16; i++){
-    //     printf(" %X", key[i]);
-    // }
-    // printf("\n");
-
-    // shiftRows_inverse(key);
-
-    // for(int i = 0; i < 16; i++){
-    //     printf(" %X", key[i]);
-    // }
-    // printf("\n");
-
-    return 0;
 }

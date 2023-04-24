@@ -364,10 +364,10 @@ void addRoundKey(uint8_t *state, uint8_t *roundKey)
     }
 }
 
-void AES_encryption(uint8_t *message, uint8_t *key)
+void encrypt_128(uint8_t *block, uint8_t *key)
 {
     uint8_t state[16];
-    memcpy(state, message, 16);
+    memcpy(state, block, 16);
 
     int numberOfRounds = 10;
 
@@ -389,13 +389,13 @@ void AES_encryption(uint8_t *message, uint8_t *key)
     shiftRows(state);
     addRoundKey(state, expandedKey + 16 * (numberOfRounds));
 
-    memcpy(message, state, 16);  
+    memcpy(block, state, 16);  
 }
 
-void aes_decryption(uint8_t *message, uint8_t *key)
+void decrypt_128(uint8_t *block, uint8_t *key)
 {
     uint8_t state[16];
-    memcpy(state, message, 16);
+    memcpy(state, block, 16);
 
     int numberOfRounds = 10;
 
@@ -416,46 +416,171 @@ void aes_decryption(uint8_t *message, uint8_t *key)
 
     addRoundKey(state, key);
 
-    memcpy(message, state, 16);  
+    memcpy(block, state, 16);  
 }
+
+/**
+ * @brief pads the message by adding bytes.
+ * @param blockSize The size to pad to.
+ * @returns The message's new length. If this is greater than capacity,
+ * Nothing has been done, increase the capacity and run again
+ * 
+ */
+size_t bytePad(uint8_t blockSize, uint8_t *message, size_t length, size_t capacity) {
+    // get amount of padding
+    // this will return the blocksize if the length
+    // is a multiple of the blocksize, which is desired
+    uint8_t padSize = blockSize - (length % blockSize);
+    size_t newLength = length + padSize;
+
+    // check capacity
+    if (newLength > capacity) {
+        // return needed capacity
+        return newLength;
+    }
+
+    // pad with zeros and then the number of padded bytes
+    // ie: fb 8c 0a 00 00 00 04
+    for(int i = 0; i < padSize - 1; i++){
+        message[length + i] = 0x00;
+    }
+    message[newLength - 1] = (uint8_t)padSize;
+
+    // return new length
+    return newLength;
+}
+
+/**
+ * @brief Removes the padding added by bytePad.
+ * @returns The new length of the message.
+ * 
+ * @param blockSize 
+ * @param message 
+ * @param length 
+ * @return size_t 
+ */
+size_t byteUnPad(uint8_t *message, size_t length) {
+    uint8_t padSize = message[length - 1];
+    return length - padSize;
+    // that was simple
+}
+
+/**
+ * @brief 
+ * 
+ * @param key 16 byte key (must be 16 bytes of known data). Will not pad if not long enough. Must be padded already.
+ * @param message 
+ * @param length 
+ * @param capacity 
+ * @return The new length of the, now encrypted message, if greater than capacity, nothing has been done.
+ * increase capacity and run again.
+ */
+size_t encrypt_128_ecb(uint8_t *key, uint8_t *message, size_t length, size_t capacity) {
+    // pad message
+    size_t newLength = bytePad(16, message, length, capacity);
+    // check capacity;
+    if (newLength > capacity){
+        // return needed capacity
+        return newLength;
+    }
+
+    // encrypt the message in blocks
+    for(size_t i = 0; i < newLength; i += 16){
+        encrypt_128(message + i, key);
+    }
+}
+
+/**
+ * @brief decrypts the message using the ecb mode of operation. Assumes that the message's length is a multiple of 16.
+ * 
+ * @param key 
+ * @param message 
+ * @param length 
+ * @return size_t 
+ */
+size_t decrypt_128_ecb(uint8_t *key, uint8_t *message, size_t length) {
+    
+    // decrypt the message in bocks
+    for(size_t i = 0; i < length; i += 16) {
+        decrypt_128(message + i, key);
+    }
+
+    // un-pad and return new length
+    return byteUnPad(message, length);
+}
+
+
+
+
 
 
 
 int main()
 {
-    uint8_t message[] = "This is a message we will encrypt with AES!";
+    // uint8_t *message = "The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog! The quick brown fox jumps over the lazy dog?";
 
-    uint8_t key[16] = {
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16
-    };
+    // message that is 32 bytes long(including null terminator)
+    uint8_t *message = "0123456789abcdef0123456789abcde";
 
-    printf("%s\n", message);
-    AES_encryption(message, key);
-    for(int i = 0; i < 16; i++){
-        printf(" %X", message[i]);
-    }
-    printf("\n");
+    uint8_t *key = "aes rules!!!!!!"; /* key padded with exclamation points to be 16 bytes, including null terminator.*/
 
-    printf(" encrypt...");
-    printf(" %s\n", message);
-    printf(" decrypt...");
-    aes_decryption(message, key);
-    printf(" %s\n", message);
+    size_t messageLength = strlen(message) + 1 /* for null terminator */;
+    size_t messageCapacity = messageLength + 16 /* for potential extra block from padding */ + 1 /* for post encryption null terminator to print message, since I'm encrypting the null terminator as well. */;
+    uint8_t *messageBuffer = malloc(messageCapacity);
+    memcpy(messageBuffer, message, messageLength);
+
+    // print message pre-encryption
+    printf("pre encryption:  %s\n", messageBuffer);
+
+    // encrypt
+    size_t encryptedLength = encrypt_128_ecb(key, messageBuffer, messageLength, messageCapacity);
+    // add null terminator so message can be printed
+    messageBuffer[encryptedLength] = '\0';
+
+    // print message post-encryption
+    printf("post encryption: %s\n", messageBuffer);
+
+    printf("post encryption length: %d\n", encryptedLength);
+
+    //decrypt
+    decrypt_128_ecb(key, messageBuffer, encryptedLength);
+
+    // print message post decryption
+    printf("post decryption: %s\n", messageBuffer);
+
+    free(messageBuffer);
+
+    // uint8_t key[16] = {
+    //     1,
+    //     2,
+    //     3,
+    //     4,
+    //     5,
+    //     6,
+    //     7,
+    //     8,
+    //     9,
+    //     10,
+    //     11,
+    //     12,
+    //     13,
+    //     14,
+    //     15,
+    //     16
+    // };
+
+    // printf("%s\n", message);
+    // encrypt_128(message, key);
+    // for(int i = 0; i < 16; i++){
+    //     printf(" %X", message[i]);
+    // }
+    // printf("\n");
+
+    // printf(" encrypt...");
+    // printf(" %s\n", message);
+    // printf(" decrypt...");
+    // decrypt_128(message, key);
+    // printf(" %s\n", message);
 
 
     // for(int i = 0; i < 16; i++){

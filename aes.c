@@ -461,8 +461,12 @@ size_t bytePad(uint8_t blockSize, uint8_t *message, size_t length, size_t capaci
  * @param length 
  * @return size_t 
  */
-size_t byteUnPad(uint8_t *message, size_t length) {
+size_t byteUnPad(uint8_t blockSize, uint8_t *message, size_t length) {
     uint8_t padSize = message[length - 1];
+    if (padSize < 0 || padSize > blockSize) {
+        // invalid block padding
+        return length;
+    }
     return length - padSize;
     // that was simple
 }
@@ -507,7 +511,7 @@ size_t decrypt_128_ecb(uint8_t *key, uint8_t *message, size_t length) {
     }
 
     // un-pad and return new length
-    return byteUnPad(message, length);
+    return byteUnPad(16, message, length);
 }
 
 int main(size_t argc, char **args) {

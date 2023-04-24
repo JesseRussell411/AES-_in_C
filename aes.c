@@ -212,18 +212,33 @@ void KeyExpansion(uint8_t *inputKey, uint8_t *expandedKeys)
     }
 }
 
+/**
+ * @brief Substitutes each byte in the ciphertext with the corrsponding byte in the s_box table.
+ * 
+ * @param state 
+ */
 void subBytes(uint8_t *state) {
     for(int i = 0; i < 16; i++){
         state[i] = s_box[state[i]];
     }
 }
 
+/**
+ * @brief Reverses the byte substitution stage using a inverse s_box table.
+ * 
+ * @param state 
+ */
 void subBytes_inverse(uint8_t *state) {
     for( int i = 0; i < 16; i++){
         state[i] = s_box_inverse[state[i]];
     }
 }
 
+/**
+ * @brief Shifts the rows in the grid to the left. Each row is shifted 1 byte more than the previous with the first not not being shifted at all.
+ * 
+ * @param state 
+ */
 void shiftRows(uint8_t *state)
 {
 
@@ -257,6 +272,11 @@ void shiftRows(uint8_t *state)
     memcpy(state, tmp, 16);
 }
 
+/**
+ * @brief Reversed the shiftRows staged by shifting them to the right.
+ * 
+ * @param state 
+ */
 void shiftRows_inverse(uint8_t *state)
 {
     // 00 04 08 12              \     00 04 08 12
@@ -289,9 +309,14 @@ void shiftRows_inverse(uint8_t *state)
     memcpy(state, tmp, 16);
 }
 
+/**
+ * @brief The mix columns stage, which is complicated.
+ * 
+ * @param state 
+ */
 void mixColumns(uint8_t *state)
 {
-    //Galois field multiplication by this matrix of the matrix made up by the state's columns
+    //Galois field matrix multiplication by this matrix of the matrix made up by the state's columns
     // |2 3 1 1| |00 05 09 13|
     // |1 2 3 1| |01 04 08 12|
     // |1 1 2 3| |02 06 10 14|
@@ -324,8 +349,13 @@ void mixColumns(uint8_t *state)
     memcpy(state, result, 16);
 }
 
+/**
+ * @brief Reversed the mix columns stage.
+ * 
+ * @param state 
+ */
 void mixColumns_inverse(uint8_t *state) {
-    //Galois field multiplication by this matrix (inverse of the one used for the non-reverse mixColumns) of the matrix made up by the state's columns
+    //Galois field matrix multiplication by this matrix (inverse of the one used for the non-reverse mixColumns) of the matrix made up by the state's columns
     // |0E 0B 0D 09| |00 05 09 13|
     // |09 0E 0B 0D| |01 04 08 12|
     // |0D 09 0E 0B| |02 06 10 14|
@@ -358,6 +388,13 @@ void mixColumns_inverse(uint8_t *state) {
     memcpy(state, result, 16);
 }
 
+
+/**
+ * @brief XORs each byte in the state with the corresponding byte in the key.
+ * 
+ * @param state 
+ * @param roundKey 
+ */
 void addRoundKey(uint8_t *state, uint8_t *roundKey)
 {
     for (int i = 0; i < 16; i++)
@@ -366,7 +403,13 @@ void addRoundKey(uint8_t *state, uint8_t *roundKey)
     }
 }
 
-void encrypt_128(uint8_t *block, uint8_t *key)
+/**
+ * @brief Encrypt the given 16 byte block with the given 16 byte key using 128 bit AES.
+ * 
+ * @param block 
+ * @param key 
+ */
+void encrypt_128(uint8_t *key, uint8_t *block)
 {
     uint8_t state[16];
     memcpy(state, block, 16);
@@ -394,7 +437,13 @@ void encrypt_128(uint8_t *block, uint8_t *key)
     memcpy(block, state, 16);
 }
 
-void decrypt_128(uint8_t *block, uint8_t *key)
+/**
+ * @brief Decrypt the given 16 byte block with the given 16 byte key using 128 bit AES.
+ * 
+ * @param block 
+ * @param key 
+ */
+void decrypt_128(uint8_t *key, uint8_t *block)
 {
     uint8_t state[16];
     memcpy(state, block, 16);
@@ -492,7 +541,7 @@ size_t encrypt_128_ecb(uint8_t *key, uint8_t *message, size_t length, size_t cap
 
     // encrypt the message in blocks
     for(size_t i = 0; i < newLength; i += 16){
-        encrypt_128(message + i, key);
+        encrypt_128(key, message + i);
     }
 }
 
@@ -507,7 +556,7 @@ size_t encrypt_128_ecb(uint8_t *key, uint8_t *message, size_t length, size_t cap
 size_t decrypt_128_ecb(uint8_t *key, uint8_t *message, size_t length) {
     // decrypt the message in bocks
     for(size_t i = 0; i < length; i += 16) {
-        decrypt_128(message + i, key);
+        decrypt_128(key, message + i);
     }
 
     // un-pad and return new length
@@ -515,67 +564,73 @@ size_t decrypt_128_ecb(uint8_t *key, uint8_t *message, size_t length) {
 }
 
 int main(size_t argc, char **args) {
+    // get command like arguments
     if (argc != 3){
-        fputs("invalid number of arguments, 2 expected", stderr);
+        fprintf(stderr, "invalid number of arguments, 2 expected");
         return 1;
     }
 
+    // mode, e for encrypt. d for decrypt
     char mode = args[1][0];
     if (mode != 'e' && mode != 'd'){
-        fputs("invalid mode expected 'e' (ecrypt) or 'd' (decrypt)", stderr);
+        fprintf(stderr, "invalid mode, expected 'e' (encrypt) or 'd' (decrypt)");
         return 1;
     }
 
-    size_t keyLength = strlen(args[2]);
+    // key in ascii
     char key[16];
     for(int i = 0; i < 16; i++) {
         key[i] = 0x00;
     }
 
-    memcpy(key, args[2], keyLength);
+    size_t keyLength = strlen(args[2]);
+    memcpy(key, args[2], keyLength < 16 ? keyLength : 16);
 
     if (keyLength < 16){
-        fputs("key too short. padding with zeros\n", stderr);
+        fprintf(stderr, "key too short. padding with zeros\n");
     } else if (keyLength > 16) {
-        fputs("key too long. extra bytes will be ignored\n", stderr);
+        fprintf(stderr, "key too long. extra bytes will be ignored\n");
     }
 
+    // get message from std in
     Buffer input = createBuffer();
-
-    size_t messageLength = 0;
-
     // read stdin
     int c;
     while((c = getchar()) != EOF) {
-        bufferAppendByte(&input, (char)c);
-        messageLength++;
+        BufferError err = bufferAppendByte(&input, (char)c);
+        if (err) {
+            destroyBuffer(&input);
+            fprintf(stderr, "failed to allocate memory while reading standard input\n");
+            return err;
+        }
     }
 
+    size_t messageLength = input.size;
 
-    // trim buffer or add capacity for padding and null terminator
-    BufferError err = bufferSetSize(&input, messageLength + 17);
+    // add capacity for padding
+    BufferError err = bufferSetSize(&input, input.size + 16);
     if (err) {
         destroyBuffer(&input);
+        fprintf(stderr, "failed to allocate memory for padding\n");
         return err;
     };
 
+    // encrypt or decrypt depending on the mode
     int newLength;
 
-    if (mode == 'e'){
-        // can ignore output as the capacity is definitely enough
+    if (mode == 'e') {
+        // can ignore output as the capacity is definitely enough for padding
         newLength = encrypt_128_ecb(key, input.data, messageLength, input.size);
     } else {
         newLength = decrypt_128_ecb(key, input.data, messageLength);
     }
 
-    // printf("%.*s", newLength, input.data);
+    // write the encrypted or decrypted message to standard output
     for(size_t i = 0; i < newLength; i++){
-        char tmp[2];
-        tmp[0] = input.data[i];
-        tmp[1] = '\0';
         printf("%c", input.data[i]);
     }
 
+    // cleanup and return 0
     destroyBuffer(&input);
     return 0;
 }

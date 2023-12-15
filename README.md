@@ -1,7 +1,7 @@
 # AES_in_C
 implementation of AES-128 in C
 
-AES encryption algorithm implemented using this fantastic paper http://web.archive.org/web/20150510100957/http://www.infosecwriters.com/text_resources/pdf/AESbyExample.pdf
+AES encryption algorithm implemented using AES by Examble by Adam Berent: http://web.archive.org/web/20150510100957/http://www.infosecwriters.com/text_resources/pdf/AESbyExample.pdf
 
 as well as the youtube series by creel https://www.youtube.com/watch?v=K2Xfm0-owS4
 
